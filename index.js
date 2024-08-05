@@ -56,6 +56,8 @@ app.post('/webhook', async (req, res) => {
         if (message_type === 'log') {
             await updateStreak(conn, user_id);
         }
+        //ping gemini
+        // call meta api for msg ack
 
         await conn.end();
         res.status(200).send('Message received and processed.');
