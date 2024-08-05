@@ -2,6 +2,8 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
+const { Configuration, OpenAIApi } = require('openai');
+const { PineconeClient } = require('@pinecone-database/pinecone');
 
 const app = express();
 const port = 3000;
@@ -15,6 +17,19 @@ const dbConfig = {
     password: 'password',
     database: 'whatsapp_fitness'
 };
+
+// OpenAI configuration
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
+
+// Pinecone configuration
+const pinecone = new PineconeClient();
+pinecone.init({
+    environment: process.env.PINECONE_ENVIRONMENT,
+    apiKey: process.env.PINECONE_API_KEY,
+});
 
 // Function to get database connection
 async function getConnection() {
@@ -35,37 +50,117 @@ async function updateChatsTable() {
 // Call this function to update the table (uncomment when needed)
 // updateChatsTable();
 
-// Route to handle incoming webhooks
-app.post('/webhook', async (req, res) => {
-    const { user_id, mobile, message, message_id, channel_id, message_type } = req.body;
+// Initialize vector DB
+async function initializeVectorDB() {
+    console.log("Initializing vector DB...");
+    // Load your documents here
+    const documents = [
+        { id: 'doc1', text: 'Information about cardio exercises...' },
+        { id: 'doc2', text: 'Nutrition guidelines for muscle building...' },
+        // Add more documents as needed
+    ];
 
-    if (!user_id || !message) {
-        return res.status(400).send('Invalid request: user_id and message are required.');
+    for (const doc of documents) {
+        await embedAndStoreDoc(doc);
     }
+    console.log("Vector DB initialization complete.");
+}
 
-    try {
-        const conn = await getConnection();
-        
-        // Insert message into chats table
-        await conn.execute(
-            'INSERT INTO chats (user_id, mobile, message, message_id, channel_id, message_type) VALUES (?, ?, ?, ?, ?, ?)',
-            [user_id, mobile, message, message_id, channel_id, message_type]
-        );
+// Embed document and store in vector DB
+async function embedAndStoreDoc(doc) {
+    const embedding = await getEmbedding(doc.text);
+    await storeEmbedding(embedding, doc);
+}
 
-        // If it's a workout log, update streak
-        if (message_type === 'log') {
-            await updateStreak(conn, user_id);
-        }
-        //ping gemini
-        // call meta api for msg ack
+async function getEmbedding(text) {
+    const response = await openai.createEmbedding({
+        model: "text-embedding-ada-002",
+        input: text,
+    });
+    return response.data.data[0].embedding;
+}
 
-        await conn.end();
-        res.status(200).send('Message received and processed.');
-    } catch (err) {
-        console.error('Error processing message:', err);
-        res.status(500).send('Internal server error.');
+async function storeEmbedding(embedding, metadata) {
+    const index = pinecone.Index("fitness-docs");
+    await index.upsert([
+        {
+            id: metadata.id,
+            values: embedding,
+            metadata: metadata,
+        },
+    ]);
+}
+
+// Answer retrieval from docs
+async function retrieveAnswer(question) {
+    const questionEmbedding = await getEmbedding(question);
+    const index = pinecone.Index("fitness-docs");
+    const queryResponse = await index.query({
+        vector: questionEmbedding,
+        topK: 5,
+        includeMetadata: true,
+    });
+
+    const context = queryResponse.matches.map(match => match.metadata.text).join("\n");
+    const answer = await generateAnswer(question, context);
+    return answer;
+}
+
+async function generateAnswer(question, context) {
+    const response = await openai.createCompletion({
+        model: "text-davinci-002",
+        prompt: `Context: ${context}\n\nQuestion: ${question}\n\nAnswer:`,
+        max_tokens: 150,
+    });
+    return response.data.choices[0].text.trim();
+}
+
+// Store user activity
+async function storeUserActivity(user_id, activity_type, details) {
+    const conn = await getConnection();
+    await conn.execute(
+        'INSERT INTO user_activity (user_id, activity_type, details) VALUES (?, ?, ?)',
+        [user_id, activity_type, JSON.stringify(details)]
+    );
+    await conn.end();
+}
+
+// Handle slash commands
+async function handleSlashCommand(command, args, user_id) {
+    switch (command) {
+        case 'help':
+            return "Available commands: /help, /streak, /log, /question";
+        case 'streak':
+            return await getUserStreak(user_id);
+        case 'log':
+            return await logWorkout(user_id, args.join(' '));
+        case 'question':
+            return await retrieveAnswer(args.join(' '));
+        default:
+            return "Unknown command. Type /help for available commands.";
     }
-});
+}
+
+async function getUserStreak(user_id) {
+    const conn = await getConnection();
+    const [rows] = await conn.execute(
+        'SELECT streak FROM chats WHERE user_id = ? AND message_type = "log" ORDER BY created_at DESC LIMIT 1',
+        [user_id]
+    );
+    await conn.end();
+    return rows.length > 0 ? `Your current streak is ${rows[0].streak} days!` : "You haven't started a streak yet. Log a workout to begin!";
+}
+
+async function logWorkout(user_id, workout_details) {
+    const conn = await getConnection();
+    await conn.execute(
+        'INSERT INTO chats (user_id, message, message_type) VALUES (?, ?, "log")',
+        [user_id, workout_details]
+    );
+    await updateStreak(conn, user_id);
+    await conn.end();
+    return "Workout logged successfully!";
+}
 
 async function updateStreak(conn, user_id) {
     const [rows] = await conn.execute(
@@ -90,6 +185,48 @@ async function updateStreak(conn, user_id) {
     );
 }
 
+// Route to handle incoming webhooks
+app.post('/webhook', async (req, res) => {
+    const { user_id, mobile, message, message_id, channel_id, message_type } = req.body;
+
+    if (!user_id || !message) {
+        return res.status(400).send('Invalid request: user_id and message are required.');
+    }
+
+    try {
+        const conn = await getConnection();
+        
+        // Insert message into chats table
+        await conn.execute(
+            'INSERT INTO chats (user_id, mobile, message, message_id, channel_id, message_type) VALUES (?, ?, ?, ?, ?, ?)',
+            [user_id, mobile, message, message_id, channel_id, message_type]
+        );
+
+        let response;
+
+        if (message.startsWith('/')) {
+            const [command, ...args] = message.slice(1).split(' ');
+            response = await handleSlashCommand(command, args, user_id);
+        } else if (message_type === 'log') {
+            await updateStreak(conn, user_id);
+            response = "Workout logged successfully!";
+        } else if (message_type === 'qna') {
+            response = await retrieveAnswer(message);
+        } else {
+            response = "Message received. How can I assist you today?";
+        }
+
+        // Store user activity
+        await storeUserActivity(user_id, message_type, { message, response });
+
+        await conn.end();
+        res.status(200).json({ response });
+    } catch (err) {
+        console.error('Error processing message:', err);
+        res.status(500).send('Internal server error.');
+    }
+});
+
 // Function to send reminders
 async function sendReminders() {
     const conn = await getConnection();
@@ -110,6 +247,7 @@ async function sendReminders() {
     for (const user of users) {
         // Here you would integrate with your WhatsApp API to send a reminder
         console.log(`Sending reminder to user ${user.user_id} at ${user.mobile}`);
+        // Implement your WhatsApp sending logic here
     }
 
     await conn.end();
@@ -122,4 +260,5 @@ cron.schedule('0 9 * * *', () => {
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
+    initializeVectorDB(); // Initialize vector DB on server start
 });
