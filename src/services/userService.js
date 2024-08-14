@@ -27,14 +27,14 @@ const updateProfileService = async (payload) => {
 
 const logWorkoutService = async (payload) => {
    const { phone,description} = payload;
+   const phone1 = phone[0];
+   const payld = {phone:phone1,description:description};
+   console.log(JSON.stringify(payld));
     try {
-        const query = `
-          INSERT INTO workout (phone, description)
-          VALUES (?, ?)
-        `;
-        await pool.query(query, [phone, description]);
+        const [[result]] = await pool.query(`CALL handleMomentum(?)`,[JSON.stringify(payld)]);
+        console.log(result);
     
-        return {"message": "Workout logged successfully!"};
+        return {"message": `Workout logged !\nYour Momentum Score : ${result[0].momentum} 🚀🚀\nStreak: ${result[0].streak} ⚡`};
         
     } catch (error) {
         console.error("Error in signUpUserService:", error);
