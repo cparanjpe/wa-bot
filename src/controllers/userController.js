@@ -101,9 +101,10 @@ const userQuery = async(req,res)=>{
 }
 
 const qnaDocQuery = async(req,res)=>{
-    const payload = req.body;
-    const {phone,query} = payload;
-    console.log(phone);
+    const {whatsapp,contact,contactId} = req.body;
+    const {from,time,type,text,image} = whatsapp;
+    const {name} = contact;
+    
     try {
         // Execute the query
         const client = new ChromaClient();
@@ -112,13 +113,13 @@ const qnaDocQuery = async(req,res)=>{
         });
       
         const results = await collection.query({
-            queryTexts: [`${query}`], // Chroma will embed this for you
+            queryTexts: [`${text.body.replace('/qna', '').trim() }`], // Chroma will embed this for you
             // queryTexts: ["Will the products be safe to use?"], // Chroma will embed this for you
             nResults: 4, // How many results to return
         });
       
         console.log(results.documents);
-        const prompt = `RAG for my pdf doc returns following documents from the pdf.Document:${results.documents}this is the user query. Query: ${query}.according to the documents returned construct a sentence with whole context in human language rewrite the sentence.`
+        const prompt = `RAG for my pdf doc returns following documents from the pdf.Document:${results.documents}this is the user query. Query: ${text.body.replace('/qna', '').trim()}.according to the documents returned construct a sentence with whole context in human language rewrite the sentence.`
         console.log(prompt);
         const report = await model.generateContent(prompt);
         console.log("text",report.response.text);

@@ -60,6 +60,7 @@ async function sendWhatsAppReminder(phone, name) {
 
 // Cron job to run daily at 8:00 AM
 cron.schedule('0 10 * * *', async () => {
+// cron.schedule('*/10 * * * * *', async () => {
 
   console.log('Running daily workout reminder job...');
 

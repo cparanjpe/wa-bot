@@ -85,6 +85,7 @@ async function sendWhatsAppMessage(name,phone,fitnessPlan) {
 
 // Cron job to run every Monday at 9:00 AM
 cron.schedule('0 10 * * 1', async () => {
+// cron.schedule('*/10 * * * * *', async () => {
   console.log('Running weekly fitness plan generation job...');
 
   try {

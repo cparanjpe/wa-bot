@@ -14,6 +14,7 @@ require('./cron/fitnessPlan'); // Import and run cron jobs
 
 
 const userRoutes = require('./src/routes/userRoutes');
+const webhookRoutes = require('./src/routes/webhookRoutes');
 
 const app = express();
 const port = 3000;
@@ -279,6 +280,7 @@ app.get('/',(req,res)=>{
     res.send('hello world');
 })
 app.use('/api/users', userRoutes);
+app.use('/webhook',webhookRoutes);
 
 
 app.listen(port, () => {
