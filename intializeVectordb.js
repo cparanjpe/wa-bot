@@ -21,7 +21,7 @@ function splitTextIntoChunks(text, chunkSize) {
 // Function to add documents to a ChromaDB collection
 async function addDocumentsToChromaDB() {
   try {
-    const client = new ChromaClient();
+    const client = new ChromaClient({path:'https://chroma-latest-gzr9.onrender.com'});
     const pdfText = await extractTextFromPDF('qnadoc.pdf'); // Path to your PDF
 
     // Split the text into chunks
@@ -46,7 +46,7 @@ async function addDocumentsToChromaDB() {
 
 async function query() {
   try {
-    const client = new ChromaClient();
+    const client = new ChromaClient({path:'https://chroma-latest-gzr9.onrender.com'});
     const collection = await client.getOrCreateCollection({
       name: "my_collection",
     });
@@ -64,7 +64,7 @@ async function query() {
 
 async function resetDB(){
     try {
-        const client = new ChromaClient();
+      const client = new ChromaClient({path:'https://chroma-latest-gzr9.onrender.com'});
         await client.reset() ;
         // const coll = await client.getCollection({name: "my_collection"})
         // await client.deleteCollection({name: "my_collection"})
