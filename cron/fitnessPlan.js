@@ -46,23 +46,37 @@ async function generateFitnessPlan(userProfile) {
 async function sendWhatsAppMessage(name,phone,fitnessPlan) {
     try {
       
-      const payloaddata = {
+      // const payloaddata = {
+      //   "channelId": "628ce04877212400045f14d5",
+      //   "channelType": "whatsapp",
+      //   "recipient": {
+      //     "name": name,
+      //     "phone": phone
+      //   },
+      //   "whatsapp": {
+      //     "type": "template",
+      //     "template": {
+      //       "templateName": "log1",
+      //       "bodyValues": {
+      //         "message": `${fitnessPlan}`
+      //       }
+      //     }
+      //   }
+      // };
+      const payloaddata={
         "channelId": "628ce04877212400045f14d5",
         "channelType": "whatsapp",
         "recipient": {
-          "name": name,
-          "phone": phone
+            "name": name,
+            "phone": phone
         },
         "whatsapp": {
-          "type": "template",
-          "template": {
-            "templateName": "log1",
-            "bodyValues": {
-              "message": `${fitnessPlan}`
+            "type": "text",
+            "text": {
+                "body": `${fitnessPlan}`
             }
-          }
         }
-      };
+    }
   
       const options = {
         method: "POST",
@@ -85,6 +99,7 @@ async function sendWhatsAppMessage(name,phone,fitnessPlan) {
 
 // Cron job to run every Monday at 9:00 AM
 cron.schedule('0 10 * * 1', async () => {
+// cron.schedule('*/1 * * * *', async () => {
   console.log('Running weekly fitness plan generation job...');
 
   try {

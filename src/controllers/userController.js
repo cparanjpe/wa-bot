@@ -81,6 +81,7 @@ const userQuery = async(req,res)=>{
         const [[result]] = await userQueryService(payload);
         //gemini call
         console.log(result);
+        if(!result.name)res.status(200).send('Complete your profile first !');
         const prompt = `User details: name & age:${result.name, result.age},goal:${result.goal},diet pref:${result.diet}.workouts history:${JSON.stringify(result.workouts)}.Answer the user's query based on his profile. Query: ${query}`
         console.log(prompt);
         const report = await model.generateContent(prompt);
@@ -106,7 +107,7 @@ const qnaDocQuery = async(req,res)=>{
     console.log(phone);
     try {
         // Execute the query
-        const client = new ChromaClient();
+        const client = new ChromaClient({ path: "https://chroma-latest-gzr9.onrender.com" });
         const collection = await client.getOrCreateCollection({
             name: "my_collection",
         });
