@@ -4,10 +4,10 @@ const mysql = require('mysql2/promise');
 
 // Configure the MySQL pool with the promise-based API
 const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: 'root',
-    database: 'whatsapp_bot',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USERNAME,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -29,7 +29,8 @@ async function generateFitnessPlan(userProfile) {
   Name: ${userProfile.name}, 
   Age: ${userProfile.age}, 
   Goal: ${userProfile.goal}, 
-  Diet: ${userProfile.diet}.`;
+  Diet: ${userProfile.diet},
+  Equipment:${userProfile.products||"None"}.(ignore equipment if empty)`;
   console.log(prompt);
   
   try {

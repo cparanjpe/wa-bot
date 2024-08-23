@@ -52,7 +52,13 @@ const generateReport = async(req,res)=>{
         // Execute the query
         const [[result]] = await generateReportService(payload);
         //gemini call
-        console.log(result);
+        if(result.workouts[0].description==null && result.workouts[0].workout_date==null){
+            res.status(200).send('Log Workouts to generate reports !😁');
+        }
+        else if(result.name==undefined|| result.name==null|| result.name==""){
+            res.status(200).send('Please complete your profile first !');
+        }
+        else{
         const prompt = `User details: name & age:${result.name, result.age},goal:${result.goal},diet pref:${result.diet}.workouts history:${JSON.stringify(result.workouts)}.prepare a statistical report for this report considering his workout history so that he gets and overview of what he has done. Give only bold not tabular data.`
         console.log(prompt);
         const report = await model.generateContent(prompt);
@@ -60,6 +66,7 @@ const generateReport = async(req,res)=>{
         
 
         res.status(200).send(report.response.text());
+        }
     } catch (error) {
         console.error('Error querying the database:', error);
         console.log(error)
@@ -82,7 +89,7 @@ const userQuery = async(req,res)=>{
         //gemini call
         console.log(result);
         if(!result.name)res.status(200).send('Complete your profile first !');
-        const prompt = `User details: name & age:${result.name, result.age},goal:${result.goal},diet pref:${result.diet}.workouts history:${JSON.stringify(result.workouts)}.Answer the user's query based on his profile. Query: ${query}`
+        const prompt = `User details: name & age:${result.name, result.age},goal:${result.goal},diet pref:${result.diet},equipments:${result.products}.workouts history:${JSON.stringify(result.workouts)}.Answer the user's query based on his profile. Query: ${query}`
         console.log(prompt);
         const report = await model.generateContent(prompt);
         console.log("text",report.response.text);

@@ -47,16 +47,19 @@ const generateReportService = async(payload)=>{
     console.log('agye')
     try {
         const query = `
-    SELECT u.*, JSON_ARRAYAGG(
-      JSON_OBJECT(
-        'description', w.description,
-        'workout_date', w.workout_date
-      )
-    ) AS workouts
+    SELECT u.*,COALESCE(
+        JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'description', w.description,
+            'workout_date', w.workout_date
+          )
+        ), 
+        JSON_ARRAY()
+      ) AS workouts
     FROM users u
     LEFT JOIN workout w ON w.phone = u.phone
-    WHERE u.phone = ?
-    GROUP BY u.id
+    WHERE u.phone = ? 
+    GROUP BY u.id;
   `;
     const result=  await pool.query(query, [phone]);
     console.log(result);
